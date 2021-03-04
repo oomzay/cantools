@@ -6,9 +6,51 @@ from xml.etree import ElementTree
 from ..data import Data
 from ..did import Did
 from ..internal_database import InternalDatabase
+from ...errors import Error
 
 
 LOGGER = logging.getLogger(__name__)
+
+def saw_tooth_from_linear_bitnum(linear_bit_num):
+    '''Convert from linear bit offset to the saw-tooth
+    bit numbering scheme that is assumed by the
+    bitstream encoder/decoder.
+
+    Byte Num         |    0    |    1    |
+                     |MSb   LSb|MSb   LSb|
+    Linear Bit Num   |0  ...  7|8  ... 15| << input
+    Sawtooth Bit Num |7  ...  0|15 ...  8| << output
+    '''
+    byte_num = linear_bit_num // 8
+    linear_bit_offset = linear_bit_num % 8
+    saw_bit_offset = 7 - linear_bit_offset
+    return (byte_num * 8) + saw_bit_offset
+
+def saw_tooth_start_from_linear_bitnum(byte_order, linear_first_bit, bit_len):
+    '''Convert from sequential first field bit numbering, as used in
+    CDD files, to the saw-tooth field start-bit numbering scheme
+    that is assumed by the bitstream encoder/decoder.
+
+    There are two aspects to this conversion:
+
+    1. The start bit identification convention
+
+    BigEndian fields start at their MSBit
+    LittleEndian fields start at their LSBit
+
+    2. The saw tooth bit numbering convention
+    '''
+    # Start bit convention (in linear space as it is easy)
+    if byte_order == 'big_endian':
+        start_bit = linear_first_bit  # MSBit position
+    elif byte_order == 'little_endian':
+        start_bit = linear_first_bit + bit_len - 1  # LSBit position
+    else:
+        raise Error("Unknown byte order: %s" % byte_order)
+
+    # Convert to Saw tooth bit num space
+    return saw_tooth_from_linear_bitnum(start_bit)
+
 
 
 class DataType(object):
@@ -97,8 +139,14 @@ def _load_data_types(ecu_doc):
             else:
                 LOGGER.debug("Ignoring unsupported attribute '%s'.", key)
 
-        if ctype.attrib['bo'] == '21':
+        # Decode byte order
+        bo_code = ctype.attrib['bo']
+        if bo_code == '21':
+            byte_order = 'big_endian'
+        elif bo_code == '12':
             byte_order = 'little_endian'
+        else:
+            raise Error("Unsupported byte order code '%s'.", bo_code)
 
         # Load from P-type element.
         ptype_unit = data_type.find('PVALUETYPE/UNIT')
@@ -138,10 +186,12 @@ def _load_data_element(data, offset, data_types):
 
     data_type = data_types[data.attrib['dtref']]
 
+    start_bit_index = saw_tooth_start_from_linear_bitnum(data_type.byte_order, offset, data_type.bit_length)
+
     return Data(name=data.find('QUAL').text,
-                start=offset,
+                start = start_bit_index,
                 length=data_type.bit_length,
-                byte_order='little_endian',
+                byte_order = data_type.byte_order,
                 scale=data_type.factor,
                 offset=data_type.offset,
                 minimum=data_type.minimum,
