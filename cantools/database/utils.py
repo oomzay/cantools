@@ -1,6 +1,7 @@
 # Utility functions.
 
 import binascii
+import copy
 from decimal import Decimal
 from collections import namedtuple
 
@@ -205,3 +206,55 @@ def create_encode_decode_formats(datas, number_of_bytes):
     return Formats(big_compiled,
                    little_compiled,
                    big_padding_mask & little_padding_mask)
+
+
+def linear_to_saw_tooth_bitnum(linear_bit_num):
+    '''Convert linear (c-style/CDD) bit number to
+    saw-tooth (DBC) bit numbering scheme.
+
+    Byte Num         |    0    |    1    |
+                     |MSb   LSb|MSb   LSb|
+    Linear Bit Num   |0  ...  7|8  ... 15| << input
+    Sawtooth Bit Num |7  ...  0|15 ...  8| << output
+    '''
+    byte_num = linear_bit_num // 8
+    linear_bit_offset = linear_bit_num % 8
+    saw_bit_offset = 7 - linear_bit_offset
+    return (byte_num * 8) + saw_bit_offset
+
+
+def cdd_to_dbc_start_bit(byte_order, linear_first_bit, bit_len):
+    '''Convert from sequential first field bit numbering, as used in
+    CDD records, to the DBC/saw-tooth field start-bit numbering scheme
+    that is assumed by the cantools bitstream encoder/decoder.
+
+    There are two aspects to this conversion:
+
+    1. The start bit identification convention
+
+    BigEndian fields start at their MSBit
+    LittleEndian fields start at their LSBit
+
+    2. The saw tooth bit numbering convention.
+    '''
+    # Apply DBC start bit convention (appied in linear space as it is easy)
+    if byte_order == 'big_endian':
+        start_bit = linear_first_bit  # MSBit position
+    elif byte_order == 'little_endian':
+        start_bit = linear_first_bit + bit_len - 1  # LSBit position
+    else:
+        raise Error("Unknown byte order: %s" % byte_order)
+
+    # Convert to Saw tooth bit num space
+    return linear_to_saw_tooth_bitnum(start_bit)
+
+
+def cdd_to_dbc_data(cdd_data):
+    '''Convert data with linear/c-style/CDD startbit convention to the
+     saw-tooth/DBC convention expected by the codec generator utility'''
+
+    dbc_data = copy.copy(cdd_data)
+
+    dbc_data.start = cdd_to_dbc_start_bit(cdd_data.byte_order, cdd_data.start, cdd_data.length)
+
+    return dbc_data

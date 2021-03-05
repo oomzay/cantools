@@ -5,6 +5,7 @@ import binascii
 from ..utils import encode_data
 from ..utils import decode_data
 from ..utils import create_encode_decode_formats
+from ..utils import cdd_to_dbc_data
 
 
 class Did(object):
@@ -123,10 +124,17 @@ class Did(object):
         """Refresh the internal DID state.
 
         """
+        # Map datas with CDD start bit convention to datas with DBC start bit
+        # convention as required by the codec generator that is shared with
+        # DBC datas.
+        #
+        # FUTURE: Consider creating a decicated C-style codec to avoid this mangling.
+        #
+        dbc_datas = [cdd_to_dbc_data(data) for data in self._datas]
 
         self._codec = {
             'datas': self._datas,
-            'formats': create_encode_decode_formats(self._datas,
+            'formats': create_encode_decode_formats(dbc_datas,
                                                     self._length)
         }
 
