@@ -32,15 +32,15 @@ class Database(object):
 
         return self._dids
 
-    def add_cdd(self, fp):
+    def add_cdd(self, fp, class_filter = None):
         """Read and parse CDD data from given file-like object and add the
         parsed data to the database.
 
         """
 
-        self.add_cdd_string(fp.read())
+        self.add_cdd_string(fp.read(), class_filter = class_filter)
 
-    def add_cdd_file(self, filename, encoding='utf-8'):
+    def add_cdd_file(self, filename, encoding = 'utf-8', class_filter = None):
         """Open, read and parse CDD data from given file and add the parsed
         data to the database.
 
@@ -48,16 +48,16 @@ class Database(object):
 
         """
 
-        with fopen(filename, 'r', encoding=encoding) as fin:
-            self.add_cdd(fin)
+        with fopen(filename, 'r', encoding = encoding) as fin:
+            self.add_cdd(fin, class_filter = class_filter)
 
-    def add_cdd_string(self, string):
+    def add_cdd_string(self, string, class_filter = None):
         """Parse given CDD data string and add the parsed data to the
         database.
 
         """
 
-        database = cdd.load_string(string)
+        database = cdd.load_string(string, class_filter = class_filter)
         self._dids = database.dids
         self.refresh()
 

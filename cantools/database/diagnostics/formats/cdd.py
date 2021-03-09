@@ -190,7 +190,7 @@ def _load_did_element(did, data_types):
                datas=datas)
 
 
-def load_string(string):
+def load_string(string, class_filter = None):
     """Parse given CDD format string.
 
     """
@@ -202,6 +202,14 @@ def load_string(string):
     dids = []
 
     for diag_class in var.findall('DIAGCLASS'):
+
+        if class_filter:
+
+            class_name = diag_class.find("QUAL").text
+
+            if class_name not in class_filter:
+                continue
+
         for diag_inst in diag_class.findall('DIAGINST'):
             did = _load_did_element(diag_inst,
                                     data_types)
