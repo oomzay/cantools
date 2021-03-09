@@ -211,6 +211,10 @@ def load_string(string, class_filter = None):
                 continue
 
         for diag_inst in diag_class.findall('DIAGINST'):
+
+            if diag_inst.get('act') == '0':
+                continue
+
             did = _load_did_element(diag_inst,
                                     data_types)
             dids.append(did)
